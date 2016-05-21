@@ -2,12 +2,18 @@
 ! variable depth
 ! extra outputs for global version
 
-	program gldstn
+!	program  gldstn
+	subroutine  gldstn(first_gldstn, have_TS_atm, sdedy_oc,ts_oc_for_atm,k2)
 	USE IFPORT	!module to use TIMEF() function (= elapsed_time)
 	include 'var.f90'
+!	include 'varAGCM.f90' 
+	     real  TS_atm_for_oc(0:72+1,0:72+1), QS_atm_for_oc(0:72+1,0:72+1),&
+             PREC_atm_for_oc(0:72+1,0:72+1)  
+         common /varsAGCM/  TS_atm_for_oc, QS_atm_for_oc, PREC_atm_for_oc
 	real elapsed_time, elapsed_time0
 	real avn, avs, sum, sums(8*maxl), tv(maxl,maxi,maxj,maxk), rms
 	real sum1, sum2, sum3,sum4,cor, pacsf
+	integer k2(0:maxi+1,0:maxj+1)              !GLD GGGGGGGGGG
 ! to average osc runs
 ! real ats(maxl,maxi,maxj,maxk), au(3,maxi,maxj,maxk)
 ! 1   , afn(maxl,maxi,maxj,maxk)
@@ -23,8 +29,7 @@
       real zpsi(0:maxi,0:maxk), zu(maxi,maxk)
 
       integer nsteps, npstp, iwstp, itstp, iw, icount,&
-              i, j, k, l, istep, iterun, isol, isl, natm,iice,sdeyr0
-
+           i, j, k, l, istep, iterun, isol, isl, natm,iice,sdeyr0,sdedy_oc
       character ans,lout*3,lin*6,ext*3,conv*3,name*10
 
       logical flat, osc
@@ -33,11 +38,14 @@
       real psisl(0:maxi,0:maxj,isles), ubisl(2,0:maxi+1,0:maxj,isles)&
           ,erisl(isles+1,isles+1), psibc(2)
 !ctest1    ,erisl(isles,isles+1), psibc(2)
-!############
-	real yatm(1:74,1:46), ts_oc_atm(0:maxi+1,0:maxj+1),arg  !for AGCM
-	logical end_of_day
+!############  GLD GGGGGGGG
+	real  ts_oc_for_atm(0:maxi+1,0:maxj+1), arg  !for AGCM
+	logical end_of_day, first_gldstn, have_TS_atm
+	
+	real yatm(1:74,1:46)!for AGCM
 	real SCOSZ(maxj),solfor1(maxj),plot(maxi,maxj) !seasonal run
 	character id_mnth*2 !=Jn or Jl
+      integer istep1
 !############
 
 ! for repeated runs forward or backward
@@ -49,16 +57,23 @@
 !******** file write tq1 for diagn and surfer
 !******         open(555,file=trim(path_results)//'tq1')
 !********
+!GLD GGGGGGGGG
+      sdedy=sdedy_oc
+      if (.not. first_gldstn) goto 123
+      istep=1    
+!GLD GGGGGGGGG
         elapsed_time0 = TIMEF( )
-       path_source='..\..\source\' ! Tagir insteadof: g:\gldstn_F90_1980\source\
-       path_results='..\..\results\' ! Tagir insteadof: g:\gldstn_F90_1980\results\
+       path_source='..\..\gldstn_F90_1980\source\'
+!       path_source='c:\gldstn_F90_1980\source\'
+!       path_results='c:\gldstn_F90_1980\results\'
+        path_results='..\..\gldstn_F90_1980\results\'
 !********  open run parameters file *************
          open(5,file=trim(path_source)//'goinS') !seasonal basic exper.
 !         open(5,file=trim(path_source)//'goinMelt') !ice melting exper.
 
       print*,'nsteps npstp iwstp itstp'
       read(5,*)nsteps,npstp,iwstp,itstp
-!      nsteps=6251 !1000 !500000 !stop after nsteps steps
+      ! nsteps=400 !1000 !500000 !stop after nsteps steps
 !At multiples of npstp the subroutine diag is called which writes some
 !information to unit 6, normally the screen. diag is called again at the
 !next step so you can spot any oscillatory instability easily. The second
@@ -80,11 +95,13 @@
 ! EMBM
 ! subroutine gseta, sets up  atmosphere and sea-ice
       call gseta
+      sdedy_oc=sdedy
 	  solfor1=solfor  !fix mean year insolation
 
       print*,'file extension for output (a3) ?'
       read(5,'(a3)')lout
-!###      lout='tm1'
+      lout='w29'   !GLD GGGGGGGGG
+      print*,lout
 
       open(4,file=trim(path_results)//lout//'.'//'t')
       write(4,'(11(a11,3x))')'%time      ',' Pac_T_d   ',' Atl_T_d   ',' Ind_T_d   ',' Sou_T_d   ',&
@@ -100,7 +117,8 @@
       else
          print*,'input file extension for input (a6)'
          read(5,'(a6)')lin
-!####         lin='tm1.1'
+         lin='w29.3'  !GLD GGGGGGGGG
+      print*,lin
          open(1,file=trim(path_results)//lin)
 
 ! subroutine inm.f reads in data gldstn
@@ -108,9 +126,9 @@
 
          call inm(1)
          close(1)
+         sdedy_oc=sdedy
          t0 = 0. !Init time
          t = t0 !Init time
-
 ! perturb the salinity
 ! print*,'perturbing the i.c.'
 ! do k=10 ,16
@@ -151,13 +169,14 @@
 
       print*,'seasonal or mean solar run ?'
       read(5,'(a1)')ans
+      ans='s' !GLD GGGGGGGGG
+      print*,ans
       if (ans.eq.'s'.or.ans.eq.'S') then
        print*,'seasonal solar run '
 	endif
       if (ans.eq.'m'.or.ans.eq.'M') then
        print*,'mean solar run '
 	endif
-	pause
 ! periodic b.c. (required for implicit code)
 
       do k=1,kmax
@@ -243,7 +262,7 @@
       print*,'island path integrals due to unit sources',&
                ((erisl(isl,isol),isl=1,isles),isol=1,isles)
 ! wind.f sets wind stress forcing for barotropic streamfunction
-      call wind
+      call wind_mean
 
       iw = 1
       icount = 0
@@ -252,9 +271,23 @@
           tq_avr=0.
 	    ice_avr=0.
 !#################
-! time loop %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-      do istep=1,nsteps
+ 123     k2=k1    !globe map
+   if (have_TS_atm) then   !GLD GGGGGGG
+  ! Must be after interpolation: 
+         do j=1,jmax
+           do i=1,imax  
+            write (144,*) i,j,tq(1,i,j)-TS_atm_for_oc(i,j),k2(i,j) !GGGGGGGGGG
+    !        write (145,*) i,j,k2(i,j) !GGGGGGGGGG
+           tq(1,i,j)=TS_atm_for_oc(i,j) 
+           tq(2,i,j)=QS_atm_for_oc(i,j) 
+           pptn(i,j)=PREC_atm_for_oc(i,j) 
+           enddo
+         enddo
+      ! stop 'tq-ts'  !test difference
+   endif
+ ! time loop %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  do istep1=1,1 !****nsteps
+      istep=istep+1
       istepCO2=istepCO2+1
 
 ! calculation of atmospheric advective velocities
@@ -341,7 +374,7 @@
 
             do isl=1,isles
 ! island.f subroutine to calculate path integral around island.
-               call island(ub,erisl(isl,isles+1),isl,1)
+              call island(ub,erisl(isl,isles+1),isl,1)
             enddo
 
 !****#ifdef disle2
@@ -423,18 +456,6 @@
 ! if(mod(istep,npstp).lt.1) call diaga
 
          enddo
-         
-        !// Dignostics temperature and quit point 
-        do j=1,jmax
-            do i=1,imax
-                write(1444,*) i,j,k1(i,j),ts(1,i,j,8)
-            enddo
-        enddo
-        !// Diagnostics interpolation 
-        call interpolate(ts(1,:,:,kmax), k1)
-        
-        stop 'ts'
-
 
          t = istep*dt(kmax) + t0
 	   istepT=istep
@@ -444,16 +465,22 @@
          end_of_day= .true. ! - if dt = 1day!!!!
 
          if (end_of_day) then
+            do j=0,jmax+1
+               do i=0,imax+1
+                ts_oc_for_atm(i,j)=ts(1,i,j,kmax) !GLD GGGGGGGGG
+               enddo
+            enddo
 	 ! sdedy - day of year
 	 ! SDEYR - year
-          call SDET(SCOSZ) !seasonal solar
-          if (ans.eq.'s'.or.ans.eq.'S') then
-	      solfor=SCOSZ
-	    endif
-	   endif
+            call SDET_OC(SCOSZ) !seasonal solar
+            sdedy_oc=sdedy      !GLD GGGGGGGGG
+            if (ans.eq.'s'.or.ans.eq.'S') then
+	         solfor=SCOSZ
+	        endif
+	     endif  !end_of_day
  !#############
 
-         if(mod(istep,npstp).lt.1)then
+         if(mod(istep,npstp).lt.1)then  !npstp=1000
           elapsed_time =  TIMEF( )   !MCLOCK( )
 
           print*
@@ -492,10 +519,11 @@
 ! close (7)
                rms = sqrt(rms/lmax/ntot/dt(kmax)/dt(kmax))
                print*,'r.m.s. r.o.c.',rms
-            endif
+            endif 
 	      call diaga
          endif  !npstp
          if(mod(istep,iwstp).eq.0)then
+	goto 999
             ext=conv(mod(iw,10)) !output (after iwstp steps) file number
             open(2,file=trim(path_results)//lout//'.'//ext)
             rewind 2
@@ -507,9 +535,8 @@
 
             !#########################
             !Interpolation from ts(1,i,j,kmax) to yatm (74,46)
-	goto 999
-            ts_oc_atm(0:imax+1,0:jmax+1)=ts(1,0:imax+1,0:jmax+1,kmax)
-            call oc_atm(ts_oc_atm,yatm,imax,jmax)
+            ts_oc_for_atm(0:imax+1,0:jmax+1)=ts(1,0:imax+1,0:jmax+1,kmax)
+            ! call oc_atm(ts_oc_for_atm,yatm,imax,jmax) possibly not necessary !!
 
             open(57,file=trim(path_results)//lout//'.'//'yoc')
 
@@ -518,17 +545,17 @@
             do 22 i=8,imax
              if(k1(i,j).le.kmax)then !ocean and # interior wet points
               write(57,1 ) i-7,5.*asin(arg),ts(1,i,j,kmax)
-	       else
+	         else
               write(57,1 ) i-7,5.*asin(arg)
-	       endif
-   22       continue
+	         endif
+   22       continue  !i
             do 20 i=1,8
              if(k1(i,j).le.kmax)then !ocean and # interior wet points
               write(57,1 ) 29+i,5.*asin(arg),ts(1,i,j,kmax)
-	       else
+	         else
               write(57,1 ) 29+i,5.*asin(arg)
-	       endif
-   20       continue
+	         endif
+   20       continue !i
             close (57) !yoc
             open(58,file=trim(path_results)//lout//'.'//'yatm')
 
@@ -536,11 +563,11 @@
             do 21 i=2,74
              if(abs(yatm(i,j)).lt.1.e-7)then
                      write(58,2 ) i-1,j  !land
-		   else     !ocean and # interior wet points
+		     else     !ocean and # interior wet points
                      write(58,2 ) i-1,j,yatm(i,j)
-	       endif
+	         endif
 
-   21       continue
+   21     continue  !j,i
            close (58) !yatm
 
    1       format (1x, i3,',',e12.4,',',e12.4)
@@ -653,10 +680,10 @@
          
          
 	!######## every month output
+            open(42,file=trim(path_results)//lout//'.'//'MonthGlob')
 
          if(sdedy==15 .or.sdedy==197.or.sdedy==106 .or.sdedy==288)then
 !         if(MNTHDY.eq.15)then
-            open(42,file=trim(path_results)//lout//'.'//'MonthGlob')
             call diag4(sum1,sum2,sum3,sum4,iice)
             write(42,119)istep,sum1,sum2,sum3,sum4,iice
          endif
@@ -667,7 +694,7 @@
 	   i_avr=i_avr+1
 
          if(mod(istep,itstp).eq.0)then
-	    sdeyr0=sdeyr
+	           sdeyr0=sdeyr
          endif !itstp
 
 	   if (sdeyr==sdeyr0.and.sdedy==365) then
@@ -786,6 +813,9 @@
           open(10,file=trim(path_results)//lout//'.opsip'//id_mnth)
           write(10,100)((opsip(j,k),j=0,jmax),k=0,kmax)
           close(10)
+          open(101,file=trim(path_results)//lout//'.opsipS'//id_mnth)
+          write(101,'(1x,2i4,e12.4)')((j,k,opsip(j,k)*1592.5,j=0,jmax),k=0,kmax)
+          close(101)
 
           omina = 0.
           omaxa = 0.
@@ -806,6 +836,9 @@
           open(10,file=trim(path_results)//lout//'.opsia'//id_mnth)
           write(10,100)((opsia(j,k),j=0,jmax),k=0,kmax)
           close(10)
+          open(102,file=trim(path_results)//lout//'.opsiaS'//id_mnth)
+          write(102,'(1x,2i4,e12.4)')((j,k,opsia(j,k)*1592.5,j=0,jmax),k=0,kmax)
+          close(102)
 
 ! zonal overturning streamfunction
 
@@ -947,10 +980,13 @@
 ! enddo
 ! close(20)
 	   endif ! Seasonal run: Jan and Jul last year output #######
-
+      if (istep==nsteps) goto 567 
       enddo   ! time loop end %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        return   ! to AGCM
 
-      close(4)
+ 567     close(4)
+      close(5)
+      close(11)
       close(14)
 	  close(39)
       close(40)
@@ -960,7 +996,9 @@
 !#########      close(43)
 ! close(8)
 ! close(9)
-       stop 'normal end'
+      print *,' sdedy_oc = ',sdedy_oc, istep
+      !pause ' pause GLDSTN STEP END'
+      stop 'normal end'
 
       end !program end
 
